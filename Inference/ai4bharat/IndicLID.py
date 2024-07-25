@@ -1,7 +1,9 @@
-# import packages
-
 import os
 import sys
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+
 import re
 from tqdm import tqdm
 import pandas as pd
@@ -61,15 +63,16 @@ class IndicLID():
 
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-        self.IndicLID_FTN_path = 'models/indiclid-ftn/model_baseline_roman.bin'
-        self.IndicLID_FTR_path = 'models/indiclid-ftr/model_baseline_roman.bin'
-        self.IndicLID_BERT_path = 'models/indiclid-bert/basline_nn_simple.pt'
+        self.IndicLID_FTN_path = os.path.abspath(r'models/indiclid-ftn/model_baseline_roman.bin')
+        self.IndicLID_FTR_path = os.path.abspath(r'models/indiclid-ftr/model_baseline_roman.bin')
+        self.IndicLID_BERT_path = os.path.abspath(r'models/indiclid-bert/basline_nn_simple.pt')
 
         self.IndicLID_FTN = fasttext.load_model(self.IndicLID_FTN_path)
         self.IndicLID_FTR = fasttext.load_model(self.IndicLID_FTR_path)
         self.IndicLID_BERT = torch.load(self.IndicLID_BERT_path, map_location = self.device)
         self.IndicLID_BERT.eval()
-        self.IndicLID_BERT_tokenizer = AutoTokenizer.from_pretrained("ai4bharat/IndicBERTv2-MLM-only")
+        # self.IndicLID_BERT_tokenizer = AutoTokenizer.from_pretrained("ai4bharat/IndicBERTv2-MLM-only")
+        self.IndicLID_BERT_tokenizer = AutoTokenizer.from_pretrained("ai4bharat/indictrans2-en-indic-1B", trust_remote_code=True)
         
         self.input_threshold = input_threshold
         self.model_threshold = roman_lid_threshold
@@ -187,12 +190,12 @@ class IndicLID():
         input_len = len(list(input))
 
         # count special character spaces and newline in string
-        special_char_pattern = re.compile('[@_!#$%^&*()<>?/\|}{~:]')
+        special_char_pattern = re.compile(r'[@_!#$%^&*()<>?/\|}{~:]')
         special_char_matches = special_char_pattern.findall(input)
         special_chars = len(special_char_matches)
         
-        spaces = len(re.findall('\s', input))
-        newlines = len(re.findall('\n', input))
+        spaces = len(re.findall(r'\s', input))
+        newlines = len(re.findall(r'\n', input))
 
         # subtract total-special character counts
         total_chars = input_len - (special_chars + spaces + newlines)
@@ -266,9 +269,10 @@ class IndicLID():
                 word_embeddings = self.IndicLID_BERT_tokenizer(batch_inputs, return_tensors="pt", padding=True, truncation=True, max_length=512)
                     
                 word_embeddings = word_embeddings.to(self.device)
+                # print(word_embeddings)
             
                 batch_outputs = self.IndicLID_BERT(word_embeddings['input_ids'], 
-                            token_type_ids=word_embeddings['token_type_ids'], 
+                            # token_type_ids=word_embeddings['token_type_ids'], 
                             attention_mask=word_embeddings['attention_mask']
                             )
                 
@@ -327,6 +331,7 @@ class IndicLID():
         
         output_dict = self.native_inference(native_inputs, output_dict)
         output_dict = self.roman_inference(roman_inputs, output_dict, batch_size)
+
         
         results = self.post_process(output_dict)
         return results
